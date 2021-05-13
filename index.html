@@ -10,13 +10,25 @@
 	<body>
 		<div id="display">
 			<div id="panel">
+				<p>AM2R Suit Editor</p>
+				<canvas id="canvas" width="270px" height="450px"></canvas>
 				<p>Gravity Suit</p>
-				<canvas id="suit" width="270px" height="450px"></canvas>
 				<p>Front View</p>
 			</div>
 			<div id="sidebar">
-				<p>More Text</p>
+				<p>Placeholder Text</p>
+				<div id="targetDiv">
+					<span id="targetColorSpan"></span>
+					<p id="targetColorText"></p>
+				</div>
+				<br>
+				<div id="replaceDiv">
+					<span id="replaceColorSpan"></span>
+					<p id="replaceColorText"></p>
+				</div>
+				<p>Placeholder Text</p>
 			</div>
 		</div>
+		<input type="color" id="colorPicker" value=#0000ff>
 	</body>
 </html>
