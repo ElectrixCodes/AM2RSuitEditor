@@ -186,3 +186,7 @@ p, button {
 	font-size: 20pt;
 	line-height: 16px;
 }
+
+#colorPicker {
+	display: none;
+}
