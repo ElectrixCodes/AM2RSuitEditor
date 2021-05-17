@@ -5,7 +5,7 @@
 	suitCanvas Setup
 */
 
-const suitNames = ["power", "varia", "gravity", "fusion", "fusionVaria", "fusionGravity"];
+const suitNames = ["power", "varia", "gravity", "fusion_power", "fusion_varia", "fusion_gravity"];
 const poseNames = ["front", "side", "walk", "run", "morph_ball"];
 const poseImageCount = [4, 4, 10, 10, 8]; // Helps determine how many images there are to load
 const poseOffsets = [0, 45, 55, 65, 81]; // Helps vertically center the suit on suitCanvas
@@ -38,13 +38,7 @@ setAnimationSpeed(1);
 // Changes the current suit. This function is called at the beginning of the program
 function setSuit(index) {
 	suitIndex = index;
-	let suitText;
-	if (suitIndex < 4) {
-		suitText = suitNames[suitIndex].toUpperCase() + " SUIT";
-	} else { // add space for fusionVaria and fusionGravity
-		suitText = "FUSION " + suitNames[suitIndex].substring(6).toUpperCase() + " SUIT";
-	}
-	document.getElementById("suitText").innerHTML = suitText;
+	document.getElementById("suitText").innerHTML = suitNames[suitIndex].toUpperCase().replace("_", " ") + " SUIT";
 	setPose(0);
 	
 	// When this image loads, the palette is initialized via paletteImg's EventListener function
@@ -219,7 +213,7 @@ const helpText = [ // Text for #helpText
 	"...Or use the \"Up\", \"Down\", \"Home\", and \"End\" keys.",
 	"Click on the suit to quickly target a specific color.",
 	"After designing a palette, click \"Export Palette\".",
-	"Place palette in:<br>AM2R/mods/palettes/suits",
+	"Place image in: Profiles/.../mods/ palettes/suits",
 	"Enjoy your custom suit colors!<br>",
 ];
 let helpIndex; // Current index of helpText
