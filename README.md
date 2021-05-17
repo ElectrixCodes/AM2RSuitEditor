@@ -12,7 +12,7 @@ This is the repository for the AM2R Suit Editor tool, which runs on GitHub Pages
 5. Enjoy your custom suit colors!
 
 ## Bugs
-If you encounter any errors while using the tool, please open an Issue on this GitHub repository, and I will fix them if I can. This repository is not open to contributions, however.
+If you encounter any errors while using the tool, please open an Issue on this GitHub repository, and I will fix them if I can. This repository is not open to contributions.
 
 ## Notes
 This tool was released on May 17th, 2021. It was designed for AM2R 1.5.2. If there are any changes to the AM2R palette system, this tool may become obsolete.
