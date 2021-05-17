@@ -8,27 +8,49 @@
 	</head>
 	
 	<body>
-		<div id="display">
-			<div id="panel">
-				<p>AM2R Suit Editor</p>
+		<div id="box">
+			<div id="leftPanel">
+				<p id="heading">AM2R Suit Editor</p>
 				<canvas id="canvas" width="270px" height="450px"></canvas>
-				<p>Gravity Suit</p>
-				<p>Front View</p>
+				<div class="variableChanger">
+					<button id="prevSuitButton" class="clickable"><</button>
+					<p id="suitText">Power Suit</p>
+					<button id="nextSuitButton" class="clickable">></button>
+				</div>
+				<div class="variableChanger">
+					<button id="prevPoseButton" class="clickable"><</button>
+					<p id="poseText">Front View</p>
+					<button id="nextPoseButton" class="clickable">></button>
+				</div>
 			</div>
-			<div id="sidebar">
-				<p>Placeholder Text</p>
+			<canvas id="palette" width="35px" height="650px"></canvas>
+			<div id="rightPanel">
+				<p id="helpText"></p>
+				<div id="helpDiv" class="variableChanger">
+					<button id="prevHelpTextButton" class="clickable"><</button>
+					<button id="nextHelpTextButton" class="clickable">></button>
+				</div>
+				<hr>
 				<div id="targetDiv">
 					<span id="targetColorSpan"></span>
 					<p id="targetColorText"></p>
 				</div>
-				<br>
-				<div id="replaceDiv">
+				<div id="replaceDiv" class="clickable">
 					<span id="replaceColorSpan"></span>
 					<p id="replaceColorText"></p>
 				</div>
-				<p>Placeholder Text</p>
+				<button id="resetColorButton" class="clickable">Reset Color</button>
+				<div class="variableChanger">
+					<button id="decreaseSpeedButton" class="clickable"><</button>
+					<p id="animationSpeedText">Speed: 1.0x</p>
+					<button id="increaseSpeedButton" class="clickable">></button>
+				</div>
+				<hr>
+				<button id="resetAllColorsButton" class="clickable">Reset All Colors</button>
+				<button id="importPaletteButton" class="clickable">Import Palette</button>
+				<button id="exportPaletteButton" class="clickable">Export Palette</button>
+				<p id="creditText">version 1.0<br>by Electrix</p>
 			</div>
 		</div>
-		<input type="color" id="colorPicker" value=#0000ff>
 	</body>
 </html>

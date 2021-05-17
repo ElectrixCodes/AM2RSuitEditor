@@ -1,129 +1,450 @@
 // script.js
 // Handles the JavaScript for this project.
 
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
+/*
+	suitCanvas Setup
+*/
 
-ctx.imageSmoothingEnabled = false; // disable interpolation when upscaling images
+const suitNames = ["power", "varia", "gravity", "fusion", "fusionVaria", "fusionGravity"];
+const poseNames = ["front", "side", "walk", "run", "morph_ball"];
+const poseImageCount = [4, 4, 10, 10, 8]; // Helps determine how many images there are to load
+const poseOffsets = [0, 45, 55, 65, 81]; // Helps vertically center the suit on suitCanvas
 
-let tempCanvas = document.createElement('canvas'); // temporary canvas used in renderSprite
-tempCanvas.width = 24;
-tempCanvas.height = 40;
-tempCtx = tempCanvas.getContext("2d");
+let suitIndex; // Index of current suit
+let poseIndex; // Index of current pose
 
-let targetColors = []; // maybe instead of using color ints, use hexidecimals?
-let replaceColors = []; // maybe just leave these as RGB pairs?
+const suitCanvas = document.getElementById("canvas"); // Suit is drawn to this canvas
+const suitCtx = suitCanvas.getContext("2d");
+suitCtx.imageSmoothingEnabled = false; // Disables pixel interpolation
 
-let suit = "gravity";
-let pose = "front";
-let imageIndex = 0;
+const suitHelperCanvas = document.createElement("canvas"); // Canvas used for manipulating suit's color data
+const suitHelperCtx = suitHelperCanvas.getContext("2d");
 
-let sprites = [];
-let stop = (pose == "morph_ball" ? 8 : 4);
-for(let i = 0; i < stop; i++) {
-	sprites.push(new Image());
-	sprites[i].crossOrigin = "anonymous";
-	sprites[i].src = "https://electrixcodes.github.io/AM2RSuitEditor/assets/sprites/" + suit + "/" + pose + "/" + i.toString() + ".png";
+let sprites; // Array of images to draw to suitCanvas
+let animationFrame; // Index of sprites
+
+let unloadedImageCount; // Suit will start being drawn after this reaches 0
+let suitCanvasLoop; // Helps with setInterval and clearInterval
+let animationSpeed; // Current animation speed, from 0x to 1.5x
+
+// Note: changes are only applied after setInterval call
+function setAnimationSpeed(x) {
+	animationSpeed = Math.max(0, Math.min(x, 1.5));
+	document.getElementById("animationSpeedText").innerHTML = "Speed: " + animationSpeed.toString().padEnd(2, ".").padEnd(4, "0") + "x";
 }
 
-// Updates the sprite with the next frame of its animation.
-function suitLoop() {
-	imageIndex = (imageIndex + 1) % sprites.length;
-	renderSprite();
+setAnimationSpeed(1);
+
+// Changes the current suit. This function is called at the beginning of the program
+function setSuit(index) {
+	suitIndex = index;
+	let suitText;
+	if (suitIndex < 4) {
+		suitText = suitNames[suitIndex].toUpperCase() + " SUIT";
+	} else { // add space for fusionVaria and fusionGravity
+		suitText = "FUSION " + suitNames[suitIndex].substring(6).toUpperCase() + " SUIT";
+	}
+	document.getElementById("suitText").innerHTML = suitText;
+	setPose(0);
+	
+	// When this image loads, the palette is initialized via paletteImg's EventListener function
+	paletteImg.src = "https://electrixcodes.github.io/AM2RSuitEditor/assets/palettes/" + suitNames[suitIndex] + ".png";
 }
 
-// Recolors the sprite and draws it to the canvas
-function renderSprite() {
-	tempCtx.drawImage(sprites[imageIndex], 0, 0);
-	let spriteData = tempCtx.getImageData(0, 0, 24, 40);
-	let stop = 4 * spriteData.width * spriteData.height;
-	for (let index = 0; index < stop; index += 4) {
-		if (spriteData.data[index + 3] == 0) { // skip loop if pixel is transparent
-			continue;
-		}
-		let pixelColor = toColorInt(spriteData.data[index], spriteData.data[index + 1], spriteData.data[index + 2]); // R,G,B to color integer
-		let targetIndex = targetColors.indexOf(pixelColor);
-		if (targetIndex != -1) {
-			let newPixelColor = toRGB(replaceColors[targetIndex]);
-			spriteData.data[index] = newPixelColor.r;
-			spriteData.data[index + 1] = newPixelColor.g;
-			spriteData.data[index + 2] = newPixelColor.b;
+// Changes the current pose, loading the necessary images to do so
+function setPose(index) {
+	poseIndex = index;
+	document.getElementById("poseText").innerHTML = poseNames[poseIndex].toUpperCase().replace("_", " ") + " VIEW";
+	
+	unloadedImageCount = poseImageCount[poseIndex];
+	
+	sprites = [];
+	animationFrame = 0;
+	let stop = unloadedImageCount;
+	for(let i = 0; i < stop; i++) {
+		sprites.push(new Image());
+		sprites[i].crossOrigin = "anonymous"; // Avoids security errors
+		sprites[i].addEventListener("load", imageLoaded);
+		sprites[i].src = "https://electrixcodes.github.io/AM2RSuitEditor/assets/sprites/" + suitNames[suitIndex] + "/" + poseNames[poseIndex] + "/" + i.toString() + ".png";
+	}
+}
+
+// This function starts the suit-drawing loop once all images in sprites have loaded
+function imageLoaded() {
+	unloadedImageCount--;
+	if (unloadedImageCount == 0) {
+		clearInterval(suitCanvasLoop);
+		suitHelperCanvas.width = sprites[0].width;
+		suitHelperCanvas.height = sprites[0].height;
+		drawSuit();
+		if (animationSpeed > 0) {
+			suitCanvasLoop = setInterval(drawNextSuitFrame, 300 / animationSpeed);
 		}
 	}
-	tempCtx.putImageData(spriteData, 0, 0);
-	ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
 }
 
-// Takes a (r, g, b) pair and converts it to a color integer
-function toColorInt(r, g, b) {
-	return (r << 16) + (g << 8) + b;
+// Called regularly. Draws the suit with the next frame of its animation
+function drawNextSuitFrame() {
+	animationFrame = (animationFrame + 1) % sprites.length;
+	drawSuit();
 }
 
-// Takes a color integer and converts it to a (r, g, b) pair
-function toRGB(colorInt) {
-	let c = 0xff03c0; // 16712640
-	return {
-		r: (colorInt & 0xff0000) >> 16,
-		g: (colorInt & 0x00ff00) >> 8,
-		b: (colorInt & 0x0000ff)
-	};
+// Recolors the suit and draws it to suitCanvas
+function drawSuit() {
+	suitHelperCtx.clearRect(0, 0, suitHelperCanvas.width, suitHelperCanvas.height);
+	suitHelperCtx.drawImage(sprites[animationFrame], 0, 0);
+	let helperInfo = suitHelperCtx.getImageData(0, 0, suitHelperCanvas.width, suitHelperCanvas.height);
+	let stop = 4 * helperInfo.width * helperInfo.height;
+	for(let i = 0; i < stop; i += 4) { // Iterate through pixels on helper canvas
+		if (helperInfo.data[i + 3] != 0) { // If pixel is not transparent
+			let pixelRGB = [helperInfo.data[i], helperInfo.data[i + 1], helperInfo.data[i + 2]];
+			for(let j = 0; j < targetColors.length; j++) { // Iterate through target colors
+				let targetRGB = targetColors[j];
+				if (pixelRGB[0] == targetRGB[0] && pixelRGB[1] == targetRGB[1] && pixelRGB[2] == targetRGB[2]) { // Pixel color matches target color
+					let replaceRGB = replaceColors[j];
+					helperInfo.data[i] = replaceRGB[0];
+					helperInfo.data[i + 1] = replaceRGB[1];
+					helperInfo.data[i + 2] = replaceRGB[2];
+					break;
+				}
+			}
+		}
+	}
+	suitHelperCtx.putImageData(helperInfo, 0, 0); // Update suitHelperCanvas with new pixel data
+	suitCtx.clearRect(0, 0, suitCanvas.width, suitCanvas.height);
+	suitCtx.drawImage(suitHelperCanvas, 0, poseOffsets[poseIndex], suitCanvas.width, suitHelperCanvas.height * (suitCanvas.width / suitHelperCanvas.width)); // Scale and draw suit
 }
 
-function setTargetColor(r, g, b) {
-	let rgbString = "(" + r + ", " + g + ", " + b + ")";
-	let rgbStringInverted = "(" + (255 - r) + ", " + (255 - g) + ", " + (255 - b) + ")";
+
+/*
+	paletteCanvas Setup
+*/
+
+const paletteCanvas = document.getElementById("palette"); // Palette is drawn to this canvas
+const paletteCtx = paletteCanvas.getContext("2d");
+paletteCtx.imageSmoothingEnabled = false; // Disables pixel interpolation
+
+const paletteHelperCanvas = document.createElement("canvas"); // Canvas used for manipulating pixel color data
+const paletteHelperCtx = paletteHelperCanvas.getContext("2d");
+paletteHelperCanvas.width = 2;
+
+let targetColors = []; // Array of colors (as [r, g, b] arrays) to target during suit recoloring
+let replaceColors; // Array of replacement colors for suit recoloring
+let paletteIndex; // Current index of targetColors/replaceColors
+
+let paletteImg = new Image(); // Current palette image
+paletteImg.crossOrigin = "anonymous"; // Avoids security errors
+
+// Adds colors to targetColors and replaceColors based on color data from paletteImg. (paletteImg's src is assigned in setSuit function)
+paletteImg.addEventListener("load", function() {
+	paletteHelperCanvas.height = paletteImg.height;
+	paletteCtx.clearRect(0, 0, paletteCanvas.width, paletteCanvas.height);
+	paletteHelperCtx.drawImage(paletteImg, 0, 0);
+	
+	// Iterate through first column of paletteImg and append color data to targetColors
+	helperInfo = paletteHelperCtx.getImageData(0, 0, 1, paletteHelperCanvas.height);
+	stop = 4 * paletteHelperCanvas.height;
+	targetColors = [];
+	for(let i = 0; i < stop; i += 4) {
+		rgb = [helperInfo.data[i], helperInfo.data[i + 1], helperInfo.data[i + 2]];
+		targetColors.push(rgb);
+	}
+	replaceColors = targetColors.map(rgb => rgb.slice()); // "Deep" clone targetColors
+	setPaletteIndex(0);
+});
+
+// Updates the palette index
+function setPaletteIndex(index) {
+	paletteIndex = index;
+	
+	// Update target color display
+	let rgb = targetColors[paletteIndex];
+	let rgbString = "(" + rgb.join(", ") + ")";
 	document.getElementById("targetColorSpan").style.backgroundColor = "rgb" + rgbString;
-	document.getElementById("targetColorSpan").style.borderColor = "rgb" + rgbStringInverted;
 	document.getElementById("targetColorText").innerHTML = "Target Color:<br>" + rgbString;
+	
+	// Update replace color display, which also redraws the palette
+	setReplaceColor(replaceColors[paletteIndex]);
 }
 
-function setReplaceColor(r, g, b) {
-	let rgbString = "(" + r + ", " + g + ", " + b + ")";
-	let rgbStringInverted = "(" + (255 - r) + ", " + (255 - g) + ", " + (255 - b) + ")";
+// Changes the current replace color
+function setReplaceColor(rgb) {
+	replaceColors[paletteIndex] = [...rgb]; // Clone to avoid weird errors
+	let rgbString = "(" + rgb.join(", ") + ")";
 	document.getElementById("replaceColorSpan").style.backgroundColor = "rgb" + rgbString;
-	document.getElementById("replaceColorSpan").style.borderColor = "rgb" + rgbStringInverted;
 	document.getElementById("replaceColorText").innerHTML = "Replace Color:<br>" + rgbString;
+	drawPalette();
+}
+
+// Draws the palette to paletteCanvas
+function drawPalette() {
+	paletteHelperCtx.drawImage(paletteImg, 0, 0);
+	
+	// Change the second column of pixels to match replaceColors
+	let helperInfo = paletteHelperCtx.getImageData(1, 0, 1, paletteHelperCanvas.height);
+	let stop = 4 * paletteHelperCanvas.height;
+	for(let i = 0; i < stop; i += 4) {
+		let newRGB = replaceColors[Math.floor(i / 4)];
+		helperInfo.data[i] = newRGB[0];
+		helperInfo.data[i + 1] = newRGB[1];
+		helperInfo.data[i + 2] = newRGB[2];
+	}
+	paletteHelperCtx.putImageData(helperInfo, 1, 0); // Update paletteHelperCanvas with new pixel data
+	paletteCtx.drawImage(paletteHelperCanvas, 0, 0, paletteCanvas.width, paletteCanvas.height); // Scale and draw palette
+	
+	// Draw palette slider
+	let targetRGB = targetColors[paletteIndex];
+	if ((targetRGB[0] + targetRGB[1] + targetRGB[2]) / 3 > 128) {
+		paletteCtx.strokeStyle = "black";
+	} else {
+		paletteCtx.strokeStyle = "white";
+	}
+	paletteCtx.lineWidth = 2;
+	paletteCtx.strokeRect(0, paletteIndex * (paletteCanvas.height / paletteHelperCanvas.height), paletteCanvas.width, paletteCanvas.height / paletteHelperCanvas.height);
 }
 
 
-setInterval(suitLoop, 500); // todo: make this default animation speed more precise
-setTargetColor(0, 0, 0);
-setReplaceColor(0, 0, 0);
+
+setSuit(0);
 
 
-document.getElementById("replaceDiv").addEventListener("click", function() {
-	document.getElementById("colorPicker").click();
+
+/*
+	Help Text Setup
+*/
+
+const helpText = [ // Text for #helpText
+	"To change suit colors, click \"Replace Color\".",
+	"Click on the palette to change the target color...",
+	"...Or use the \"Up\", \"Down\", \"Home\", and \"End\" keys.",
+	"Click on the suit to quickly target a specific color.",
+	"After designing a palette, click \"Export Palette\".",
+	"Place palette in:<br>AM2R/mods/palettes/suits",
+	"Enjoy your custom suit colors!<br>",
+];
+let helpIndex; // Current index of helpText
+
+function setHelpIndex(n) {
+	helpIndex = n;
+	document.getElementById("helpText").innerHTML = helpText[helpIndex]
+	+ "<br>" + "&nbsp;".repeat(13) + "(" + (helpIndex + 1) + "/" + helpText.length + ")";
+}
+
+setHelpIndex(0);
+
+// Go to previous page of help text on button click
+document.getElementById("prevHelpTextButton").addEventListener("click", function() {
+	setHelpIndex(Math.max(0, helpIndex - 1));
 });
 
-document.getElementById("colorPicker").addEventListener("input", function() {
-	let colorInt = parseInt(this.value.substring(1), 16);
-	let colorRGB = toRGB(colorInt);
-	setReplaceColor(colorRGB.r, colorRGB.g, colorRGB.b);
-	renderSprite();
+// Go to next page of help text on button click
+document.getElementById("nextHelpTextButton").addEventListener("click", function() {
+	setHelpIndex(Math.min(helpIndex + 1, helpText.length - 1));
 });
 
-canvas.addEventListener("click", function(evt) {
-	let rect = canvas.getBoundingClientRect();
+
+/*
+	Event Handling: Left Panel
+*/
+
+// Clicking on the suit to change palette index
+suitCanvas.addEventListener("click", function(evt) {
+	let rect = suitCanvas.getBoundingClientRect();
 	let mouseX = evt.clientX - rect.left;
 	let mouseY = evt.clientY - rect.top;
 	
-	tempCtx.drawImage(sprites[imageIndex], 0, 0);
-	let spriteData = tempCtx.getImageData(0, 0, 24, 40).data;
+	suitHelperCtx.drawImage(sprites[animationFrame], 0, 0);
+	let helperInfo = suitHelperCtx.getImageData(0, 0,  suitHelperCanvas.width, suitHelperCanvas.height);
 	
-	let pixelCol = Math.floor(mouseX / 11.25);
-	let pixelRow = Math.floor(mouseY / 11.25);
-	let index = 4 * ((pixelRow * tempCanvas.width) + pixelCol);
-	if (spriteData[index + 3] != 0) { // pixel is not transparent
-		let pixelColor = toColorInt(spriteData[index], spriteData[index + 1], spriteData[index + 2]);
-		setTargetColor(spriteData[index], spriteData[index + 1], spriteData[index + 2]);
+	let pixelCol = Math.floor(mouseX * (suitHelperCanvas.width / suitCanvas.width));
+	let pixelRow = Math.floor((mouseY - poseOffsets[poseIndex]) * (suitHelperCanvas.width / suitCanvas.width));
+	let index = 4 * ((pixelRow * suitHelperCanvas.width) + pixelCol);
+	if (helperInfo.data[index + 3] != 0) { // Ignore transparent pixels
+		for(let i = 0; i < targetColors.length; i++) {
+			let pixelRGB = [helperInfo.data[index], helperInfo.data[index + 1], helperInfo.data[index + 2]];
+			let targetRGB = targetColors[i];
+			if (pixelRGB[0] == targetRGB[0] && pixelRGB[1] == targetRGB[1] && pixelRGB[2] == targetRGB[2]) { // Pixel color matches target color
+				setPaletteIndex(i);
+				break;
+			}
+		}
 	}
-	
-	/*let canvasPixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-	let index = 4 * ((canvas.width * mouseY) + mouseX);
-	
-	if (canvasPixels[index + 3] != 0) { // pixel is not transparent
-		let pixelColor = toColorInt(canvasPixels[index], canvasPixels[index + 1], canvasPixels[index + 2]);
-		document.getElementById("targetColorSpan").style.backgroundColor = "rgb(" + canvasPixels[index] + ", " + canvasPixels[index + 1] + ", " + canvasPixels[index + 2] + ")";
+});
+
+// Change to previous suit on click
+document.getElementById("prevSuitButton").addEventListener("click", function() {
+	if (confirm("Change suit?\nWarning: This will clear your current palette.")) {
+		setSuit((suitIndex + suitNames.length - 1) % suitNames.length);
 	}
-	*/
+});
+
+// Change to next suit on click
+document.getElementById("nextSuitButton").addEventListener("click", function() {
+	if (confirm("Change suit?\nWarning: This will clear your current palette.")) {
+		setSuit((suitIndex + 1) % suitNames.length);
+	}
+});
+
+// Change to previous pose on click
+document.getElementById("prevPoseButton").addEventListener("click", function() {
+	setPose((poseIndex + poseNames.length - 1) % poseNames.length);
+});
+
+// Change to next pose on click
+document.getElementById("nextPoseButton").addEventListener("click", function() {
+	setPose((poseIndex + 1) % poseNames.length);
+});
+
+
+/*
+	Event Handling: Palette
+*/
+
+// Clicking on the palette to change palette index
+paletteCanvas.addEventListener("click", function(evt) {
+	let rect = paletteCanvas.getBoundingClientRect();
+	let mouseY = evt.clientY - rect.top;
+	let pixelRow = Math.floor(mouseY * (paletteHelperCanvas.height / paletteCanvas.height));
+	setPaletteIndex(pixelRow);
+});
+
+// Keyboard input to change palette index
+document.addEventListener("keydown", function(evt) {
+	if (evt.keyCode == 38) { // up arrow
+		setPaletteIndex(Math.max(paletteIndex - 1, 0));
+	} else if (evt.keyCode == 40) { // down arrow
+		setPaletteIndex(Math.min(paletteIndex + 1, targetColors.length - 1));
+	} else if (evt.keyCode == 36 || evt.keyCode == 33) { // home or page up
+		setPaletteIndex(0);
+	} else if (evt.keyCode == 35 || evt.keyCode == 34) { // end or page dn
+		setPaletteIndex(targetColors.length - 1);
+	} else {
+		return;
+	}
+	evt.preventDefault(); // avoid scrolling window
+});
+
+// Mouse scroll to change palette index
+paletteCanvas.addEventListener("wheel", function(evt) {
+	if (evt.deltaY < 0) { // scrolling up
+		setPaletteIndex(Math.max(paletteIndex - 1, 0));
+	} else { // scrolling down
+		setPaletteIndex(Math.min(paletteIndex + 1, targetColors.length - 1));
+	}
+	evt.preventDefault(); // avoid scrolling the window
+});
+
+
+/*
+	Event Handling: Right Panel
+*/
+
+
+// Opens a color picker window when replaceDiv is clicked
+document.getElementById("replaceDiv").addEventListener("click", function() {
+	let colorPicker = document.createElement("input"); // Create color picker
+	colorPicker.type = "color";
+	colorPicker.value = "#" + replaceColors[paletteIndex].map(x => {
+		const hex = x.toString(16);
+		return hex.length === 1 ? "0" + hex : hex;
+	}).join(""); // (Ugly rgb to hex conversion) Sets color picker's starting value to current replace color
+	document.body.appendChild(colorPicker); // Maybe unnecessary? Leaving it here just in case
+	
+	colorPicker.addEventListener("input", function() { // Update replace color to match color picker
+		let colorInt = parseInt(this.value.substring(1), 16);
+		let rgb = [(colorInt & 0xff0000) >> 16, (colorInt & 0x00ff00) >> 8, (colorInt & 0x0000ff)]; // Ugly hex to rgb conversion
+		setReplaceColor(rgb);
+		drawSuit();
+	});
+	
+	colorPicker.click(); // Opens color picker
+	document.body.removeChild(colorPicker);
+});
+
+// Reset replace color on button click
+document.getElementById("resetColorButton").addEventListener("click", function() {
+	let rgb = targetColors[paletteIndex];
+	setReplaceColor(rgb);
+	drawSuit();
+});
+
+// Decrease animation speed on button click
+document.getElementById("decreaseSpeedButton").addEventListener("click", function() {
+	setAnimationSpeed(animationSpeed - .25);
+	clearInterval(suitCanvasLoop);
+	drawSuit();
+	if (animationSpeed > 0) {
+		suitCanvasLoop = setInterval(drawNextSuitFrame, 300 / animationSpeed);
+	};
+});
+
+// Increase animation speed on button click
+document.getElementById("increaseSpeedButton").addEventListener("click", function() {
+	setAnimationSpeed(animationSpeed + .25);
+	clearInterval(suitCanvasLoop);
+	drawSuit();
+	if (animationSpeed > 0) {
+		suitCanvasLoop = setInterval(drawNextSuitFrame, 300 / animationSpeed);
+	};
+});
+
+// Reset all colors on button click
+document.getElementById("resetAllColorsButton").addEventListener("click", function() {
+	if (confirm("Reset all colors?\nWarning: This will clear your current palette.")) {
+		replaceColors = targetColors.map(rgb => rgb.slice()); // Clone targetColors
+		setPaletteIndex(0);
+		drawSuit();
+	}
+});
+
+
+/*
+	Import and Export Palette Buttons Setup
+*/
+
+let uploadedImg = new Image(); // Used for handling imported palettes
+uploadedImg.crossOrigin = "anonymous";
+
+// Open file dialog to upload a palette image on button click
+document.getElementById("importPaletteButton").addEventListener("click", function() {
+	if(confirm("Upload a palette?\nWarning: This will overwrite your current palette.")) {
+		let input = document.createElement('input');
+		let reader = new FileReader();
+		input.type = "file";
+		input.accept = "image/png, image/gif, image/jpeg";
+		document.body.appendChild(input);
+		input.addEventListener("change", function() {
+			reader.addEventListener("load", function() {
+				uploadedImg.src = reader.result; // Give data URL to uploadedImg
+			});
+			reader.readAsDataURL(input.files[0]); // Converts chosen file to data URL
+		});
+		input.click(); // Opens file dialog
+		document.body.removeChild(input);
+	}
+});
+
+// Update replaceColors based on color data from uploaded palette image. (uploadedImg's src is assigned in import palette button's EventListener function)
+uploadedImg.addEventListener("load", function() {
+	replaceColors = [];
+	paletteHelperCtx.clearRect(0, 0, paletteHelperCanvas.width, paletteHelperCanvas.height);
+	paletteHelperCtx.drawImage(uploadedImg, 0, 0);
+	helperInfo = paletteHelperCtx.getImageData(1, 0, 1, paletteHelperCanvas.height);
+	let stop = 4 * paletteHelperCanvas.height;
+	for(let i = 0; i < stop; i += 4) {
+		let rgb = [helperInfo.data[i], helperInfo.data[i + 1], helperInfo.data[i + 2]];
+		replaceColors.push(rgb);
+	}
+	setPaletteIndex(0);
+	drawSuit();
+});
+
+// Download current palette on button click
+document.getElementById("exportPaletteButton").addEventListener("click", function() {
+	let a = document.createElement('a');
+	a.href = paletteHelperCanvas.toDataURL();
+	a.download = suitNames[suitIndex] + ".png";
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
 });
