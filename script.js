@@ -333,6 +333,7 @@ paletteCanvas.addEventListener("wheel", function(evt) {
 	Event Handling: Right Panel
 */
 
+// Open color picker on div click
 document.getElementById("replaceDiv").addEventListener("click", function() {
 	let colorPicker = document.getElementById("colorPicker");
 	colorPicker.value = "#" + replaceColors[paletteIndex].map(x => {
@@ -350,29 +351,6 @@ colorPicker.addEventListener("input", function() {
 	setReplaceColor(rgb);
 	drawSuit();
 });
-
-/*
-// Opens a color picker window when replaceDiv is clicked
-document.getElementById("replaceDiv").addEventListener("click", function() {
-	let colorPicker = document.createElement("input"); // Create color picker
-	colorPicker.type = "color";
-	colorPicker.value = "#" + replaceColors[paletteIndex].map(x => {
-		const hex = x.toString(16);
-		return hex.length === 1 ? "0" + hex : hex;
-	}).join(""); // (Ugly rgb to hex conversion) Sets color picker's starting value to current replace color
-	document.body.appendChild(colorPicker); // Maybe unnecessary? Leaving it here just in case
-	
-	colorPicker.addEventListener("input", function() { // Update replace color to match color picker
-		let colorInt = parseInt(this.value.substring(1), 16);
-		let rgb = [(colorInt & 0xff0000) >> 16, (colorInt & 0x00ff00) >> 8, (colorInt & 0x0000ff)]; // Ugly hex to rgb conversion
-		setReplaceColor(rgb);
-		drawSuit();
-	});
-	
-	colorPicker.click(); // Opens color picker
-	document.body.removeChild(colorPicker);
-});
-*/
 
 // Reset replace color on button click
 document.getElementById("resetColorButton").addEventListener("click", function() {
